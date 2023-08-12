@@ -75,8 +75,7 @@ class LlamaGrammar:
     @classmethod
     def from_file(cls, file: Union[str, Path], verbose: bool = True) -> "LlamaGrammar":
         try:
-            with open(file) as f:
-                grammar = f.read()
+            grammar = Path(file).read_text()
         except Exception as err:
             raise Exception(
                 f"{cls.from_file.__name__}: error reading grammar file: {err}"
@@ -357,15 +356,11 @@ class std:
         ) -> Tuple["std.map[T, U].iterator[T, U]", bool]:
             if key in self:
                 return self.iterator(self, key), False
-            else:
-                self[key] = value
-                return self.iterator(self, key), True
+            self[key] = value
+            return self.iterator(self, key), True
 
         def find(self, key: T) -> "std.map[T, U].iterator[T, U]":
-            if key in self:
-                return self.iterator(self, key)
-            else:
-                return self.end()
+            return self.iterator(self, key) if key in self else self.end()
 
         def at(self, key: T) -> U:
             if key in self:
@@ -500,7 +495,7 @@ def get_symbol_id(state: parse_state, src: const_char_p, len: int) -> int:
 # }
 def generate_symbol_id(state: parse_state, base_name: str) -> int:
     next_id = state.symbol_ids.size()  # type: int
-    state.symbol_ids[base_name + "_" + str(next_id)] = next_id
+    state.symbol_ids[f"{base_name}_{str(next_id)}"] = next_id
     return next_id
 
 
@@ -602,7 +597,7 @@ def parse_hex(src: const_char_p, size: int) -> Tuple[int, const_char_p]:
             break
         pos += 1
     if pos != end:
-        raise RuntimeError("expecting " + str(size) + " hex chars at " + str(src))
+        raise RuntimeError(f"expecting {size} hex chars at {str(src)}")
     return (value, pos)
 
 
@@ -646,7 +641,7 @@ def parse_char(src: const_char_p) -> Tuple[int, const_char_p]:
         elif case in ("\\", '"', "[", "]"):
             return (ord(case), src + 2)  # implicit cast
         else:
-            raise RuntimeError("unknown escape at " + str(src))
+            raise RuntimeError(f"unknown escape at {str(src)}")
     elif src[0]:
         return decode_utf8(src)
     else:
@@ -668,7 +663,7 @@ def parse_name(src: const_char_p) -> const_char_p:
     while is_word_char(pos[0]):
         pos += 1
     if pos == src:
-        raise RuntimeError("expecting name at " + str(src))
+        raise RuntimeError(f"expecting name at {str(src)}")
     return pos
 
 
@@ -735,9 +730,6 @@ def parse_sequence(
                     LlamaGrammarElement(llama_gretype.LLAMA_GRETYPE_CHAR, char_pair[0])
                 )
             pos = parse_space(pos + 1, is_nested)
-        # } else if (*pos == '[') { // char range(s)
-        #     pos++;
-        #     enum llama_gretype start_type = LLAMA_GRETYPE_CHAR;
         elif pos[0] == "[":  # char range(s)
             pos += 1
             start_type = llama_gretype.LLAMA_GRETYPE_CHAR  # type: llama_gretype
@@ -783,12 +775,6 @@ def parse_sequence(
                     )
             # pos = parse_space(pos + 1, is_nested);
             pos = parse_space(pos + 1, is_nested)
-        # } else if (is_word_char(*pos)) { // rule reference
-        #     const char * name_end    = parse_name(pos);
-        #     uint32_t     ref_rule_id = get_symbol_id(state, pos, name_end - pos);
-        #     pos = parse_space(name_end, is_nested);
-        #     last_sym_start = out_elements.size();
-        #     out_elements.push_back({LLAMA_GRETYPE_RULE_REF, ref_rule_id});
         elif is_word_char(pos[0]):  # rule reference
             name_end = parse_name(pos)  # type: const_char_p
             ref_rule_id = get_symbol_id(state, pos, name_end - pos)  # type: int
@@ -797,18 +783,6 @@ def parse_sequence(
             out_elements.push_back(
                 LlamaGrammarElement(llama_gretype.LLAMA_GRETYPE_RULE_REF, ref_rule_id)
             )
-        # } else if (*pos == '(') { // grouping
-        #     // parse nested alternates into synthesized rule
-        #     pos = parse_space(pos + 1, true);
-        #     uint32_t sub_rule_id = generate_symbol_id(state, rule_name);
-        #     pos = parse_alternates(state, pos, rule_name, sub_rule_id, true);
-        #     last_sym_start = out_elements.size();
-        #     // output reference to synthesized rule
-        #     out_elements.push_back({LLAMA_GRETYPE_RULE_REF, sub_rule_id});
-        #     if (*pos != ')') {
-        #         throw std::runtime_error(std::string("expecting ')' at ") + pos);
-        #     }
-        #     pos = parse_space(pos + 1, is_nested);
         elif pos[0] == "(":  # grouping
             # parse nested alternates into synthesized rule
             pos = parse_space(pos + 1, True)
@@ -820,15 +794,11 @@ def parse_sequence(
                 LlamaGrammarElement(llama_gretype.LLAMA_GRETYPE_RULE_REF, sub_rule_id)
             )
             if pos[0] != ")":
-                raise RuntimeError("expecting ')' at " + str(pos))
+                raise RuntimeError(f"expecting ')' at {str(pos)}")
             pos = parse_space(pos + 1, is_nested)
-        # } else if (*pos == '*' || *pos == '+' || *pos == '?') { // repetition operator
-        #     if (last_sym_start == out_elements.size()) {
-        #         throw std::runtime_error(std::string("expecting preceeding item to */+/? at ") + pos);
-        #     }
         elif pos[0] in ("*", "+", "?"):  # repetition operator
             if last_sym_start == out_elements.size():
-                raise RuntimeError("expecting preceding item to */+/? at " + str(pos))
+                raise RuntimeError(f"expecting preceding item to */+/? at {str(pos)}")
             # // apply transformation to previous symbol (last_sym_start to end) according to
             # // rewrite rules:
             # // S* --> S' ::= S S' |
@@ -887,9 +857,6 @@ def parse_sequence(
                 LlamaGrammarElement(llama_gretype.LLAMA_GRETYPE_RULE_REF, sub_rule_id)
             )
             pos = parse_space(pos + 1, is_nested)
-        # } else {
-        #     break;
-        # }
         else:
             break
     #     }
@@ -964,8 +931,8 @@ def parse_rule(state: parse_state, src: const_char_p) -> const_char_p:
     rule_id = get_symbol_id(state, src, name_len)  # type: int
     name = std.string(src, name_len)  # type: str
 
-    if not (pos[0] == ":" and pos[1] == ":" and pos[2] == "="):
-        raise RuntimeError("expecting ::= at " + str(pos))
+    if pos[0] != ":" or pos[1] != ":" or pos[2] != "=":
+        raise RuntimeError(f"expecting ::= at {str(pos)}")
 
     pos = parse_space(pos + 3, True)  # type: const_char_p
     pos = parse_alternates(state, pos, name, rule_id, False)  # type: const_char_p
@@ -975,7 +942,7 @@ def parse_rule(state: parse_state, src: const_char_p) -> const_char_p:
     elif pos[0] == "\n":
         pos += 1
     elif pos[0]:
-        raise RuntimeError("expecting newline or end at " + str(pos))
+        raise RuntimeError(f"expecting newline or end at {str(pos)}")
     return parse_space(pos, True)
 
 
@@ -1013,7 +980,7 @@ def parse(src: const_char_p) -> parse_state:
 #     }
 # }
 def print_grammar_char(file: TextIO, c: int) -> None:
-    if 0x20 <= c and c <= 0x7F:
+    if 0x20 <= c <= 0x7F:
         file.write(chr(c))
     else:
         # cop out of encoding UTF-8
@@ -1056,7 +1023,7 @@ def print_rule(
     #     fprintf(file, "%s ::= ", symbol_id_names.at(rule_id).c_str());
     if rule.empty() or rule.back().type != llama_gretype.LLAMA_GRETYPE_END.value:
         raise RuntimeError(
-            "malformed rule, does not end with LLAMA_GRETYPE_END: " + str(rule_id)
+            f"malformed rule, does not end with LLAMA_GRETYPE_END: {rule_id}"
         )
     print(f"{symbol_id_names.at(rule_id)} ::=", file=file, end=" ")
     #     for (size_t i = 0, end = rule.size() - 1; i < end; i++) {
@@ -1101,7 +1068,7 @@ def print_rule(
     for i, elem in enumerate(rule[:-1]):
         case = elem.type  # type: llama_gretype
         if case is llama_gretype.LLAMA_GRETYPE_END.value:
-            raise RuntimeError("unexpected end of rule: " + str(rule_id) + "," + str(i))
+            raise RuntimeError(f"unexpected end of rule: {rule_id},{str(i)}")
         elif case is llama_gretype.LLAMA_GRETYPE_ALT:
             print("| ", file=file, end="")
         elif case is llama_gretype.LLAMA_GRETYPE_RULE_REF:
@@ -1139,12 +1106,10 @@ def print_rule(
         #         default:
         #             fprintf(file, "] ");
         if is_char_element(elem):
-            if rule[i + 1].type in (
+            if rule[i + 1].type not in (
                 llama_gretype.LLAMA_GRETYPE_CHAR_ALT.value,
                 llama_gretype.LLAMA_GRETYPE_CHAR_RNG_UPPER.value,
             ):
-                pass
-            else:
                 print("] ", file=file, end="")
     #             }
     #         }

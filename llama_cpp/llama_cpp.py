@@ -51,7 +51,7 @@ def _load_shared_library(lib_base_name: str):
         _base_path = _lib.parent.resolve()
         _lib_paths = [_lib.resolve()]
 
-    cdll_args = dict()  # type: ignore
+    cdll_args = {}
     # Add the library directory to the DLL search path on Windows (if needed)
     if sys.platform == "win32" and sys.version_info >= (3, 8):
         os.add_dll_directory(str(_base_path))

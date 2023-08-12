@@ -119,7 +119,7 @@ def gpt_params_parse(argv = None):
         help="poll user input upon seeing PROMPT (can be\nspecified more than once for multiple prompts).",
         dest="antiprompt"
     )
-    
+
     parser.add_argument("--lora", type=str, default="", help="apply LoRA adapter (implies --no-mmap)", dest="lora_adapter")
     parser.add_argument("--lora-base", type=str, default="", help="optional model to use as a base for the layers modified by the LoRA adapter", dest="lora_base")
 
@@ -134,7 +134,7 @@ def gpt_params_parse(argv = None):
     parser.add_argument(
         "-i", "--interactive", action="store_true", help="run in interactive mode", dest="interactive"
     )
-    
+
     parser.add_argument("--embedding", action="store_true", help="", dest="embedding")
     parser.add_argument(
         "--interactive-first",
@@ -169,7 +169,7 @@ def gpt_params_parse(argv = None):
     )
 
     args = parser.parse_args(argv)
-    
+
     logit_bias_str = args.logit_bias_str
     delattr(args, "logit_bias_str")
     params = GptParams(**vars(args))
@@ -180,7 +180,7 @@ def gpt_params_parse(argv = None):
     if (logit_bias_str != None):
         for i in logit_bias_str:
             if (m := re.match(r"(\d+)([-+]\d+)", i)):
-                params.logit_bias[int(m.group(1))] = float(m.group(2))
+                params.logit_bias[int(m[1])] = float(m[2])
 
     return params
 
