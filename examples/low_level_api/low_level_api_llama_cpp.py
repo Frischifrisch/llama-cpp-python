@@ -92,7 +92,7 @@ while remaining_tokens > 0:
                 flush=True,
             )
 
-    if len(embd) > 0 and embd[-1] == llama_cpp.llama_token_eos():
+    if embd and embd[-1] == llama_cpp.llama_token_eos():
         break
 
 print()

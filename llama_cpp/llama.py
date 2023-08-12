@@ -71,7 +71,7 @@ class LlamaRAMCache(BaseLlamaCache):
 
     @property
     def cache_size(self):
-        return sum([state.llama_state_size for state in self.cache_state.values()])
+        return sum(state.llama_state_size for state in self.cache_state.values())
 
     def _find_longest_prefix_key(
         self,
@@ -198,7 +198,7 @@ StoppingCriteria = Callable[[List[int], List[float]], bool]
 
 class StoppingCriteriaList(List[StoppingCriteria]):
     def __call__(self, input_ids: List[int], logits: List[float]) -> bool:
-        return any([stopping_criteria(input_ids, logits) for stopping_criteria in self])
+        return any(stopping_criteria(input_ids, logits) for stopping_criteria in self)
 
 
 class Llama:
@@ -433,10 +433,10 @@ class Llama:
                 llama_cpp.c_int(n_tokens),
                 llama_cpp.c_bool(add_bos),
             )
-            if n_tokens < 0:
-                raise RuntimeError(
-                    f'Failed to tokenize: text="{text}" n_tokens={n_tokens}'
-                )
+        if n_tokens < 0:
+            raise RuntimeError(
+                f'Failed to tokenize: text="{text}" n_tokens={n_tokens}'
+            )
         return list(tokens[:n_tokens])
 
     def detokenize(self, tokens: List[int]) -> bytes:
@@ -807,11 +807,7 @@ class Llama:
         if self.verbose:
             llama_cpp.llama_reset_timings(self.ctx)
 
-        if isinstance(input, str):
-            inputs = [input]
-        else:
-            inputs = input
-
+        inputs = [input] if isinstance(input, str) else input
         data: List[EmbeddingData] = []
         total_tokens = 0
         for index, input in enumerate(inputs):
